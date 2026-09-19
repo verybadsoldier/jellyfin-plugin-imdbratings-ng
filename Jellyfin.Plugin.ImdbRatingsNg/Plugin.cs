@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -25,6 +25,7 @@ namespace Jellyfin.Plugin.ImdbRatingsNg
         {
             Instance = this;
             MigrateOldConfiguration(applicationPaths, xmlSerializer);
+            CleanupOldPluginDirectories(applicationPaths);
         }
 
         /// <inheritdoc />
@@ -107,6 +108,145 @@ namespace Jellyfin.Plugin.ImdbRatingsNg
             }
 
             return false;
+        }
+
+        private void CleanupOldPluginDirectories(IApplicationPaths applicationPaths)
+        {
+            try
+            {
+                var currentPluginDir = Path.GetDirectoryName(GetType().Assembly.Location);
+                TryCleanupOldPluginDirectories(currentPluginDir, applicationPaths.PluginsPath);
+            }
+            catch
+            {
+                // Suppress any top-level exceptions during directory cleanup
+            }
+        }
+
+        internal static List<string> TryCleanupOldPluginDirectories(
+            string? currentPluginDir,
+            string pluginsPath)
+        {
+            var deletedDirectories = new List<string>();
+
+            if (string.IsNullOrEmpty(pluginsPath) || !Directory.Exists(pluginsPath))
+            {
+                return deletedDirectories;
+            }
+
+            string? normalizedCurrent = null;
+            if (!string.IsNullOrEmpty(currentPluginDir))
+            {
+                try
+                {
+                    normalizedCurrent = Path.GetFullPath(currentPluginDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+                catch
+                {
+                    normalizedCurrent = currentPluginDir;
+                }
+            }
+
+            string[] directories;
+            try
+            {
+                directories = Directory.GetDirectories(pluginsPath);
+            }
+            catch
+            {
+                return deletedDirectories;
+            }
+
+            foreach (var dir in directories)
+            {
+                string normalizedDir;
+                try
+                {
+                    normalizedDir = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
+                catch
+                {
+                    normalizedDir = dir;
+                }
+
+                // Never delete the current active plugin directory
+                if (!string.IsNullOrEmpty(normalizedCurrent) && string.Equals(normalizedDir, normalizedCurrent, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var dirName = Path.GetFileName(normalizedDir);
+                if (string.IsNullOrEmpty(dirName))
+                {
+                    continue;
+                }
+
+                // Never delete the new NG plugin folders or special folders
+                if (dirName.StartsWith("IMDb Ratings NG", StringComparison.OrdinalIgnoreCase)
+                    || dirName.StartsWith("IMDbRatingsNg", StringComparison.OrdinalIgnoreCase)
+                    || dirName.StartsWith("Jellyfin.Plugin.ImdbRatingsNg", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(dirName, "configurations", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                // Must match previous plugin names
+                bool isOldNameMatch =
+                    dirName.StartsWith("IMDb Ratings", StringComparison.OrdinalIgnoreCase)
+                    || dirName.StartsWith("IMDbRatings", StringComparison.OrdinalIgnoreCase)
+                    || dirName.StartsWith("Jellyfin.Plugin.ImdbRatings", StringComparison.OrdinalIgnoreCase)
+                    || dirName.StartsWith("Jellyfin.Plugin.Imdb", StringComparison.OrdinalIgnoreCase);
+
+                if (!isOldNameMatch)
+                {
+                    continue;
+                }
+
+                // Safety verification: do not delete if it contains the new DLL
+                bool containsNewDll = File.Exists(Path.Combine(normalizedDir, "Jellyfin.Plugin.ImdbRatingsNg.dll"));
+                if (containsNewDll)
+                {
+                    continue;
+                }
+
+                bool containsOldDll =
+                    File.Exists(Path.Combine(normalizedDir, "Jellyfin.Plugin.ImdbRatings.dll"))
+                    || File.Exists(Path.Combine(normalizedDir, "Jellyfin.Plugin.Imdb.dll"));
+
+                bool containsOldMeta = false;
+                var metaFile = Path.Combine(normalizedDir, "meta.json");
+                if (File.Exists(metaFile))
+                {
+                    try
+                    {
+                        var content = File.ReadAllText(metaFile);
+                        if (content.Contains("12418add-9a9d-422d-8e35-dde91cf5baf9", StringComparison.OrdinalIgnoreCase)
+                            && !content.Contains("IMDb Ratings NG", StringComparison.OrdinalIgnoreCase))
+                        {
+                            containsOldMeta = true;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore read error
+                    }
+                }
+
+                if (containsOldDll || containsOldMeta)
+                {
+                    try
+                    {
+                        Directory.Delete(normalizedDir, true);
+                        deletedDirectories.Add(normalizedDir);
+                    }
+                    catch
+                    {
+                        // Suppress if file is locked or permission issue
+                    }
+                }
+            }
+
+            return deletedDirectories;
         }
     }
 }
