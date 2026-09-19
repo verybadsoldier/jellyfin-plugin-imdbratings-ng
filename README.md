@@ -18,6 +18,21 @@
 
 **Jellyfin.Plugin.ImdbRatingsNg** is a custom metadata provider for [Jellyfin](https://jellyfin.org/) that imports and maintains community ratings for movies, series, and episodes using official IMDb datasets. It also automatically calculates average IMDb ratings for TV show seasons.
 
+> [!IMPORTANT]
+> **Project Renaming Notice ("NG" - Next Generation):**
+> This project was previously named **IMDb Ratings** (`Jellyfin.Plugin.ImdbRatings`). Because another project with a similar scope recently decided to rename itself to the exact same name, this repository has been renamed to **IMDb Ratings NG** (`jellyfin-plugin-imdbratings-ng`) to avoid confusion.
+> 
+> Along with this rebranding, new features have been added—like automated missing episode IMDb ID resolution, calculated season ratings, and flexible rating target mapping (Community vs. Critic ratings)—marking this as the "Next Generation" (NG) evolution of the plugin.
+>
+> ⚠️ **Notice for Existing Users:**
+> Because GitHub **Pages** does **not** automatically redirect requests when a repository is renamed, users who added the repository manifest via GitHub Pages (`https://verybadsoldier.github.io/...`) must manually update their repository URL in Jellyfin:
+> 1. In Jellyfin, navigate to **Dashboard** > **Plugins** > **Repositories**.
+> 2. Update your existing repository URL to:
+>    ```text
+>    https://verybadsoldier.github.io/jellyfin-plugin-imdbratings-ng/manifest.json
+>    ```
+> *(Your existing plugin configuration and cached ratings database will automatically and safely migrate to the NG version on startup).*
+
 > [!NOTE]
 > **Drastically Reduced Memory Footprint (v4.0.0+):**
 > The plugin uses an embedded local SQLite database rather than an in-memory cache. It uses virtually zero permanent memory while idle and performs lightning-fast indexed lookups.
