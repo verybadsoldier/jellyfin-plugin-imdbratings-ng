@@ -85,13 +85,12 @@ Once the plugin is installed and your server has restarted:
    * **Series metadata downloaders**
    * **Season metadata downloaders** *(calculates season ratings from episode ratings)*
    * **Episode metadata downloaders**
-4. **Order Dependency (Important):**
-   Ensure **The Internet Movie Database Ratings** is placed **last at the bottom of the fetcher list** for each item type (below primary fetchers like TheMovieDb, TheTVDB, or OMDb).
+4. **Order Flexibility:**
+   The plugin integrates as both a remote metadata fetcher and a custom post-refresh provider (`ICustomMetadataProvider`). Because it executes directly after primary scrapers (such as TMDb, TheTVDB, or OMDb) have fetched and merged metadata, official IMDb ratings are guaranteed to apply even on the initial library scan of a brand new title—regardless of where the provider is placed in the fetcher list.
 
-> [!IMPORTANT]
-> **Why provider ordering matters:**
-> To avoid rate limits and scraping blocks, this plugin does not perform title-based searches on IMDb. It performs direct lookups using the media's IMDb ID (`tt...`). Placing this plugin at the bottom of the list ensures your primary scraper (e.g., TMDb) fetches and stores the IMDb ID first, allowing this plugin to immediately apply the rating during the same scan.
-> *(If ordered higher, ratings will still apply, but only after the next scheduled scan or metadata refresh once the IMDb ID is present).*
+> [!TIP]
+> **Provider Ordering:**
+> You can place **The Internet Movie Database Ratings** anywhere in your metadata downloaders list. While placing it near the bottom is still traditional practice, the plugin's post-refresh pipeline guarantees that IMDb ratings will reliably override other upstream provider scores without being discarded.
 
 5. Save your changes and re-scan your library or refresh metadata.
 

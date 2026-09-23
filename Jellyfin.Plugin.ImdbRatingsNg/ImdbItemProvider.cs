@@ -41,9 +41,12 @@ using static MediaBrowser.Providers.Plugins.Imdb.ImdbItemProvider;
 
 namespace MediaBrowser.Providers.Plugins.Imdb
 {
-    public class ImdbItemProvider : IRemoteMetadataProvider<Series, SeriesInfo>,
-        IRemoteMetadataProvider<Movie, MovieInfo>, IRemoteMetadataProvider<Episode, EpisodeInfo>,
-        IRemoteMetadataProvider<Season, SeasonInfo>, ICustomMetadataProvider<Season>, IHasOrder, IDisposable
+    public class ImdbItemProvider :
+        IRemoteMetadataProvider<Series, SeriesInfo>, ICustomMetadataProvider<Series>,
+        IRemoteMetadataProvider<Movie, MovieInfo>, ICustomMetadataProvider<Movie>,
+        IRemoteMetadataProvider<Episode, EpisodeInfo>, ICustomMetadataProvider<Episode>,
+        IRemoteMetadataProvider<Season, SeasonInfo>, ICustomMetadataProvider<Season>,
+        IHasOrder, IDisposable
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILibraryManager _libraryManager;
@@ -59,12 +62,24 @@ namespace MediaBrowser.Providers.Plugins.Imdb
             IServerConfigurationManager configurationManager,
             IProviderManager providerManager,
             ILogger<ImdbItemProvider> logger)
+            : this(httpClientFactory, libraryManager, fileSystem, configurationManager, providerManager, logger, new IMDbRatingsManager(logger))
+        {
+        }
+
+        internal ImdbItemProvider(
+            IHttpClientFactory httpClientFactory,
+            ILibraryManager libraryManager,
+            IFileSystem fileSystem,
+            IServerConfigurationManager configurationManager,
+            IProviderManager providerManager,
+            ILogger<ImdbItemProvider> logger,
+            IMDbRatingsManager cache)
         {
             _httpClientFactory = httpClientFactory;
             _libraryManager = libraryManager;
             _providerManager = providerManager;
             _logger = logger;
-            _cache = new IMDbRatingsManager(_logger);
+            _cache = cache;
         }
 
         public string Name => "The Internet Movie Database Ratings";
@@ -176,6 +191,21 @@ namespace MediaBrowser.Providers.Plugins.Imdb
             });
         }
 
+        public Task<ItemUpdateType> FetchAsync(Movie item, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        {
+            return FetchItemRatingAsync(item, cancellationToken);
+        }
+
+        public Task<ItemUpdateType> FetchAsync(Series item, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        {
+            return FetchItemRatingAsync(item, cancellationToken);
+        }
+
+        public Task<ItemUpdateType> FetchAsync(Episode item, MetadataRefreshOptions options, CancellationToken cancellationToken)
+        {
+            return FetchItemRatingAsync(item, cancellationToken);
+        }
+
         public Task<ItemUpdateType> FetchAsync(Season item, MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(item);
@@ -201,6 +231,71 @@ namespace MediaBrowser.Providers.Plugins.Imdb
             }
 
             return Task.FromResult(ItemUpdateType.None);
+        }
+
+        private async Task<ItemUpdateType> FetchItemRatingAsync(BaseItem item, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(item);
+
+            var imdbId = item.GetProviderId(MetadataProvider.Imdb);
+
+            if (string.IsNullOrWhiteSpace(imdbId) && item is Episode episode && (Plugin.Instance?.Configuration.EnableEpisodeResolution ?? true))
+            {
+                Series series = null;
+                if (episode.SeriesId != Guid.Empty && _libraryManager != null)
+                {
+                    series = _libraryManager.GetItemById(episode.SeriesId) as Series;
+                }
+
+                if (series == null)
+                {
+                    try
+                    {
+                        series = episode.Series;
+                    }
+                    catch (NullReferenceException)
+                    {
+                        // In uninitialized environments, BaseItem.LibraryManager inside Episode.Series may be null
+                    }
+                }
+
+                var seriesImdbId = series?.GetProviderId(MetadataProvider.Imdb);
+                var seasonNum = episode.ParentIndexNumber;
+                var episodeNum = episode.IndexNumber;
+
+                if (!string.IsNullOrWhiteSpace(seriesImdbId) && seasonNum.HasValue && episodeNum.HasValue)
+                {
+                    imdbId = await _cache.GetEpisodeImdbIdAsync(seriesImdbId, seasonNum.Value, episodeNum.Value).ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(imdbId))
+                    {
+                        _logger.LogInformation(
+                            "Resolved in-memory IMDb ID '{0}' for episode '{1}' (S{2:D2}E{3:D2}) of series '{4}' to fetch rating",
+                            imdbId,
+                            episode.Name,
+                            seasonNum.Value,
+                            episodeNum.Value,
+                            series?.Name);
+                    }
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(imdbId))
+            {
+                return ItemUpdateType.None;
+            }
+
+            float? rating = await _cache.GetRatingAsync(imdbId).ConfigureAwait(false);
+
+            if (rating.HasValue)
+            {
+                var target = Plugin.Instance?.Configuration.RatingTarget ?? RatingTarget.Community;
+                if (RatingHelper.ApplyRating(item, rating, target, _logger))
+                {
+                    return ItemUpdateType.MetadataEdit;
+                }
+            }
+
+            return ItemUpdateType.None;
         }
 
         public Task<IEnumerable<RemoteSearchResult>> GetSearchResults(SeriesInfo searchInfo, CancellationToken cancellationToken)
