@@ -1,8 +1,0 @@
-- [bc2e607] docs(readme): announce project renaming to NG, new features, and repo url update
-- [ecd9130] fix(migration): clean up legacy plugin directories on startup and update version prefix
-- [db483c4] chore: rebranding project cause another project took the same name
-- [118e33f] feat: automated episode IMDb ID resolution for missing IDs
-- [d1cc783] feat: make the target field (community and/or critic) configurable
-- [2202311] build: add post build event to copy artifacts to jellyfin plugin directory
-- [8a17320] docs: update README.md
-- [c859119] docs: Fix IMDb Ratings plugin repository URL
