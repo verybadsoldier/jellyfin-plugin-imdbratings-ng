@@ -183,18 +183,25 @@ jobs:
           RELEASE_INFO=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/releases/tags/${RELEASE_TAG}")
           DOWNLOAD_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | test("\\.zip$")) | .browser_download_url')
           echo "download url: ${DOWNLOAD_URL}"
+
+          ZIP_NAME="${DOWNLOAD_URL##*/}"
+          echo "zip file: ${ZIP_NAME}"
           
           echo "::group::Updating manifest.json"
           REPO_URL="https://${{ github.repository_owner }}.github.io/${GITHUB_REPOSITORY#*/}"
           echo "repo url: ${REPO_URL}"
-          jprm repo add ./manifest.json "$(ls -d *.zip)" -u "${REPO_URL}" -U "${DOWNLOAD_URL}"
+          jprm repo add ./manifest.json "${ZIP_NAME}" -u "${REPO_URL}" -U "${DOWNLOAD_URL}"
           echo "::endgroup::"
 
       - name: Commit file
         run: |-
           git config --global user.name "${GITHUB_ACTOR}"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          rm -f ./*.zip ./*.md
+          git add manifest.json
+          if [ -d "imdb-ratings-ng" ]; then
+            git add imdb-ratings-ng/
+          fi
           git diff --staged --quiet || git commit -m "Update manifest.json for release ${GITHUB_REF#refs/tags/}"
 
       - name: Push changes
