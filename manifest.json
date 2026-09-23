@@ -10,6 +10,14 @@
         "image": "logo.png",
         "versions": [
             {
+                "version": "6.1.0.0",
+                "changelog": "\nchangelog\n- [a11a69b] chore(build): make ghactions more robust\n- [e77f70e] fix: the plugin will now properly inject the imdb ratings also on regular jellyfin library scans. The order of the plugins does not matter anymore",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/verybadsoldier/jellyfin-plugin-imdbratings-ng/releases/download/v6.1.0/imdb-ratings-ng_6.1.0.0.zip",
+                "checksum": "a548d28fa274fe466eb5011cd5842402",
+                "timestamp": "2026-09-23T20:08:48Z"
+            },
+            {
                 "version": "6.0.0.0",
                 "changelog": "\nchangelog\n- [bc2e607] docs(readme): announce project renaming to NG, new features, and repo url update\n- [ecd9130] fix(migration): clean up legacy plugin directories on startup and update version prefix\n- [db483c4] chore: rebranding project cause another project took the same name\n- [118e33f] feat: automated episode IMDb ID resolution for missing IDs\n- [d1cc783] feat: make the target field (community and/or critic) configurable\n- [2202311] build: add post build event to copy artifacts to jellyfin plugin directory\n- [8a17320] docs: update README.md\n- [c859119] docs: Fix IMDb Ratings plugin repository URL",
                 "targetAbi": "12.0.0.0",
